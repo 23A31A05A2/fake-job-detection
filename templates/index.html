@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Fake Job Detection</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<div class="container">
+    <h1>Fake Job Detection System</h1>
+    <p>Enter job description to check if it's real or fake</p>
+
+    <form action="/predict" method="POST">
+        <textarea name="job_text" placeholder="Paste job description here..." required></textarea>
+        <button type="submit">Check Job</button>
+    </form>
+
+    <!-- RESULT DISPLAY -->
+    {% if prediction_text %}
+        <div class="result" style="color: {{ color }}">
+            {{ prediction_text }}
+        </div>
+    {% endif %}
+</div>
+
+</body>
+</html>
