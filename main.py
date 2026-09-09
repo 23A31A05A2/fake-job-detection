@@ -1,8 +1,10 @@
-# Fake Job Detection System using Logistic Regression
+# ============================================
+# FAKE JOB DETECTION SYSTEM
+# Using NLP + TF-IDF + Logistic Regression
+# ============================================
 
 # Import libraries
 import pandas as pd
-import numpy as np
 import re
 import nltk
 
@@ -12,90 +14,203 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 
-# Download stopwords
+# ============================================
+# 1. DOWNLOAD NLTK STOPWORDS
+# ============================================
+
 nltk.download('stopwords')
 
-# Load dataset
+# ============================================
+# 2. LOAD DATASET
+# ============================================
+
 data = pd.read_csv("dataset.csv")
 
-# Display first rows
+print("Dataset loaded successfully!")
+
+print("\nFirst 5 rows:")
 print(data.head())
 
-# Check dataset information
-print(data.info())
+print("\nDataset information:")
+data.info()
 
-# Fill missing values
+# ============================================
+# 3. HANDLE MISSING VALUES
+# ============================================
+
 data = data.fillna('')
 
-# Combine important text columns
-data['text'] = data['title'] + " " + data['company_profile'] + " " + data['description'] + " " + data['requirements'] + " " + data['benefits']
+# ============================================
+# 4. COMBINE IMPORTANT TEXT COLUMNS
+# ============================================
 
-# Target column (0 = Real Job, 1 = Fake Job)
+data['text'] = (
+    data['title'] + " " +
+    data['company_profile'] + " " +
+    data['description'] + " " +
+    data['requirements'] + " " +
+    data['benefits']
+)
+
+# ============================================
+# 5. TARGET VARIABLE
+# ============================================
+
+# 0 = Real Job
+# 1 = Fake Job
+
 y = data['fraudulent']
 
-# Text preprocessing function
+# ============================================
+# 6. TEXT PREPROCESSING
+# ============================================
+
 stop_words = set(stopwords.words('english'))
 
 def clean_text(text):
 
+    # Convert to lowercase
     text = text.lower()
-    text = re.sub(r'http\S+', '', text)
-    text = re.sub('[^a-zA-Z]', ' ', text)
 
+    # Remove URLs
+    text = re.sub(r'http\S+|www\S+', '', text)
+
+    # Remove special characters and numbers
+    text = re.sub(r'[^a-zA-Z]', ' ', text)
+
+    # Split into words
     words = text.split()
-    words = [word for word in words if word not in stop_words]
+
+    # Remove stopwords
+    words = [
+        word for word in words
+        if word not in stop_words and len(word) > 2
+    ]
 
     return " ".join(words)
 
-# Apply cleaning
+
+print("\nCleaning text...")
+
 data['text'] = data['text'].apply(clean_text)
 
-# Feature extraction using TF-IDF
-vectorizer = TfidfVectorizer(max_features=5000)
+# ============================================
+# 7. TRAIN-TEST SPLIT
+# ============================================
 
-X = vectorizer.fit_transform(data['text'])
-
-# Train test split
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=42
+X_train_text, X_test_text, y_train, y_test = train_test_split(
+    data['text'],
+    y,
+    test_size=0.2,
+    random_state=42,
+    stratify=y
 )
 
-# Train Logistic Regression model
-model = LogisticRegression()
+print("\nTraining samples:", len(X_train_text))
+print("Testing samples:", len(X_test_text))
+
+# ============================================
+# 8. TF-IDF FEATURE EXTRACTION
+# ============================================
+
+vectorizer = TfidfVectorizer(
+    max_features=10000,
+    ngram_range=(1, 2),
+    min_df=5,
+    max_df=0.7
+)
+
+print("\nCreating TF-IDF features...")
+
+X_train = vectorizer.fit_transform(X_train_text)
+X_test = vectorizer.transform(X_test_text)
+
+print("TF-IDF training shape:", X_train.shape)
+print("TF-IDF testing shape:", X_test.shape)
+
+# ============================================
+# 9. TRAIN LOGISTIC REGRESSION MODEL
+# ============================================
+
+print("\nTraining Logistic Regression model...")
+
+model = LogisticRegression(
+    max_iter=1000,
+    class_weight='balanced'
+)
 
 model.fit(X_train, y_train)
 
-# Predictions
+print("Model training completed!")
+
+# ============================================
+# 10. PREDICTION
+# ============================================
+
 y_pred = model.predict(X_test)
 
-# Evaluation
-print("\nAccuracy:", accuracy_score(y_test, y_pred))
+# ============================================
+# 11. MODEL EVALUATION
+# ============================================
 
-print("\nClassification Report:\n")
+accuracy = accuracy_score(y_test, y_pred)
+
+print("\n============================================")
+print("MODEL EVALUATION")
+print("============================================")
+
+print("\nAccuracy:", accuracy)
+
+print("\nClassification Report:")
 print(classification_report(y_test, y_pred))
 
-print("\nConfusion Matrix:\n")
+print("\nConfusion Matrix:")
 print(confusion_matrix(y_test, y_pred))
 
+# ============================================
+# 12. PREDICT NEW JOB POSTING
+# ============================================
 
-# Function to predict new job description
 def predict_job(text):
 
+    # Clean input
     cleaned = clean_text(text)
 
+    # Convert text into TF-IDF
     vector = vectorizer.transform([cleaned])
 
-    prediction = model.predict(vector)
+    # Prediction
+    prediction = model.predict(vector)[0]
+
+    # Probability
+    probability = model.predict_proba(vector)[0]
 
     if prediction == 0:
-        print("This job posting is REAL")
+
+        print("\n================================")
+        print("RESULT: REAL JOB")
+        print("================================")
+        print(
+            f"Real Job Probability: {probability[0] * 100:.2f}%"
+        )
+
     else:
-        print("This job posting is FAKE")
+
+        print("\n================================")
+        print("RESULT: FAKE JOB")
+        print("================================")
+        print(
+            f"Fake Job Probability: {probability[1] * 100:.2f}%"
+        )
 
 
-# Test Example
+# ============================================
+# 13. TEST EXAMPLE
+# ============================================
+
 sample_job = """
-We are hiring data entry operators. Work from home.
+We are hiring data entry operators.
+Work from home.
 Earn 5000 dollars weekly with no experience required.
 """
 
